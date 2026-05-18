@@ -5,6 +5,8 @@
 #include <sstream>
 #include <iomanip>
 
+using namespace System::Diagnostics;   // для Stopwatch
+
 namespace CramerSolver {
 
     using namespace System;
@@ -31,7 +33,6 @@ namespace CramerSolver {
         Form1()
         {
             InitializeComponent();
-            // Установка начальной размерности 3
             nudDimension->Value = 3;
             UpdateGrids();
         }
@@ -45,6 +46,7 @@ namespace CramerSolver {
 
     private:
         System::ComponentModel::Container^ components;
+
         void InitializeComponent()
         {
             this->nudDimension = gcnew NumericUpDown();
@@ -78,7 +80,6 @@ namespace CramerSolver {
             lblDim->Text = L"Размерность (n):";
             lblDim->Location = Point(12, 12);
             lblDim->AutoSize = true;
-            // скорректируем позицию NumericUpDown
             this->nudDimension->Location = Point(lblDim->Right + 6, 10);
 
             // GroupBox матрицы
@@ -126,7 +127,7 @@ namespace CramerSolver {
             this->btnExample->Location = Point(228, 300);
             this->btnExample->Size = System::Drawing::Size(100, 30);
             this->btnExample->Click += gcnew EventHandler(this, &Form1::btnExample_Click);
-            
+
             this->btnRandom = gcnew Button();
             this->btnRandom->Text = L"Случайно";
             this->btnRandom->Location = Point(336, 300);
@@ -197,17 +198,24 @@ namespace CramerSolver {
             UpdateGrids();
         }
 
-        // Проверка ввода (только числа)
+        // Проверка ввода (только числа) + предупреждение
         System::Void dgv_CellValidating(System::Object^ sender, DataGridViewCellValidatingEventArgs^ e)
         {
             DataGridView^ dgv = safe_cast<DataGridView^>(sender);
             String^ value = e->FormattedValue->ToString();
+
             if (String::IsNullOrWhiteSpace(value))
                 return;
 
             double tmp;
             if (!Double::TryParse(value, tmp))
             {
+                // Показываем диалог с ошибкой
+                MessageBox::Show(L"Допустимы только числовые значения.\nПожалуйста, введите число.",
+                    L"Ошибка ввода",
+                    MessageBoxButtons::OK,
+                    MessageBoxIcon::Warning);
+
                 dgv->Rows[e->RowIndex]->Cells[e->ColumnIndex]->ErrorText = L"Введите число";
                 e->Cancel = true;
             }
@@ -251,13 +259,12 @@ namespace CramerSolver {
             return vec;
         }
 
-        // Решение
+        // Решение (с измерением времени)
         System::Void btnSolve_Click(System::Object^ sender, System::EventArgs^ e)
         {
             try
             {
                 int n = (int)nudDimension->Value;
-
                 auto A = ReadMatrix(dgvMatrix, n);
                 auto B = ReadConstants(dgvConstants, n);
 
@@ -265,7 +272,17 @@ namespace CramerSolver {
                 double mainDet = 0;
                 std::vector<double> auxDets;
 
-                if (!MatrixUtils::SolveCramer(A, B, n, X, mainDet, auxDets))
+                // Запуск секундомера
+                Stopwatch^ sw = gcnew Stopwatch();
+                sw->Start();
+
+                bool hasSolution = MatrixUtils::SolveCramer(A, B, n, X, mainDet, auxDets);
+
+                // Остановка и получение миллисекунд
+                sw->Stop();
+                long long elapsedMs = sw->ElapsedMilliseconds;
+
+                if (!hasSolution)
                 {
                     txtLog->Text = L"Главный определитель равен нулю. Система не имеет единственного решения.";
                     lblStatus->Text = L"Ошибка: нулевой определитель";
@@ -282,8 +299,11 @@ namespace CramerSolver {
                 for (int i = 0; i < n; i++)
                     ss << L"x" << (i + 1) << L" = " << X[i] << L"\r\n";
 
+                // Вывод времени
+                ss << L"\r\nВремя вычисления: " << elapsedMs << L" мс";
+
                 txtLog->Text = gcnew String(ss.str().c_str());
-                lblStatus->Text = L"Решение вычислено успешно";
+                lblStatus->Text = L"Решение выполнено за " + elapsedMs + L" мс";
             }
             catch (Exception^ ex)
             {
@@ -292,24 +312,23 @@ namespace CramerSolver {
             }
         }
 
-        // Очистка
+        // Очистка всех полей
         System::Void btnClear_Click(System::Object^ sender, System::EventArgs^ e)
         {
-            for each (DataGridViewRow ^ row in dgvMatrix->Rows)
-                for each (DataGridViewCell ^ cell in row->Cells)
+            for each(DataGridViewRow ^ row in dgvMatrix->Rows)
+                for each(DataGridViewCell ^ cell in row->Cells)
                     cell->Value = nullptr;
-            for each (DataGridViewRow ^ row in dgvConstants->Rows)
+            for each(DataGridViewRow ^ row in dgvConstants->Rows)
                 row->Cells[0]->Value = nullptr;
             txtLog->Clear();
             lblStatus->Text = L"Готов";
         }
 
-        // Загрузка тестового примера 3x3 (как в описании, например, простой)
+        // Загрузка тестового примера 3x3
         System::Void btnExample_Click(System::Object^ sender, System::EventArgs^ e)
         {
-            nudDimension->Value = 3; // автоматически вызовет UpdateGrids()
+            nudDimension->Value = 3;
 
-            // Заполнение матрицы A
             double a[3][3] = { {2, 1, -1},
                                {3, -2, 4},
                                {1, 1, 1} };
@@ -323,38 +342,23 @@ namespace CramerSolver {
             }
             lblStatus->Text = L"Загружен пример 3x3";
         }
-        /* Для заполнения целыми числами следующая функция 
-        void RandomFill() {
-    Random^ rand = gcnew Random();
-    int n = (int)nudDimension->Value;
-    int minVal = -100;
-    int maxVal = 100; 
 
-    for (int i = 0; i < n; i++)
-        for (int j = 0; j < n; j++)
-            dgvMatrix->Rows[i]->Cells[j]->Value = 
-                rand->Next(minVal, maxVal + 1).ToString();
-
-    for (int i = 0; i < n; i++)
-        dgvConstants->Rows[i]->Cells[0]->Value = 
-            rand->Next(minVal, maxVal + 1).ToString();
-            }
-            */
-
-            // Заполнение случайными числами
+        // Заполнение случайными ЦЕЛЫМИ числами
         void RandomFill()
         {
             Random^ rand = gcnew Random();
             int n = (int)nudDimension->Value;
+            int minVal = -100;
+            int maxVal = 100;
 
             for (int i = 0; i < n; i++)
                 for (int j = 0; j < n; j++)
                     dgvMatrix->Rows[i]->Cells[j]->Value =
-                    (rand->NextDouble() * 20.0 - 10.0).ToString("F2");
+                    rand->Next(minVal, maxVal + 1).ToString();
 
             for (int i = 0; i < n; i++)
                 dgvConstants->Rows[i]->Cells[0]->Value =
-                (rand->NextDouble() * 20.0 - 10.0).ToString("F2");
+                rand->Next(minVal, maxVal + 1).ToString();
         }
 
         System::Void btnRandom_Click(System::Object^ sender, System::EventArgs^ e)

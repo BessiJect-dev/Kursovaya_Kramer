@@ -202,12 +202,20 @@ namespace CramerSolver {
         {
             DataGridView^ dgv = safe_cast<DataGridView^>(sender);
             String^ value = e->FormattedValue->ToString();
+
+            // Пустые ячейки разрешаем без проверки
             if (String::IsNullOrWhiteSpace(value))
                 return;
 
             double tmp;
             if (!Double::TryParse(value, tmp))
             {
+                // Показываем предупреждение
+                MessageBox::Show(L"Допустимы только числовые значения.\nПожалуйста, введите число.",
+                    L"Ошибка ввода",
+                    MessageBoxButtons::OK,
+                    MessageBoxIcon::Warning);
+
                 dgv->Rows[e->RowIndex]->Cells[e->ColumnIndex]->ErrorText = L"Введите число";
                 e->Cancel = true;
             }

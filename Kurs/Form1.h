@@ -5,10 +5,8 @@
 #include <sstream>
 #include <iomanip>
 
-using namespace System::Diagnostics;   // для Stopwatch
-
 namespace CramerSolver {
-
+    using namespace System::Diagnostics;
     using namespace System;
     using namespace System::Windows::Forms;
     using namespace System::Drawing;
@@ -33,6 +31,7 @@ namespace CramerSolver {
         Form1()
         {
             InitializeComponent();
+            // Установка начальной размерности 3
             nudDimension->Value = 3;
             UpdateGrids();
         }
@@ -46,7 +45,6 @@ namespace CramerSolver {
 
     private:
         System::ComponentModel::Container^ components;
-
         void InitializeComponent()
         {
             this->nudDimension = gcnew NumericUpDown();
@@ -80,6 +78,7 @@ namespace CramerSolver {
             lblDim->Text = L"Размерность (n):";
             lblDim->Location = Point(12, 12);
             lblDim->AutoSize = true;
+            // скорректируем позицию NumericUpDown
             this->nudDimension->Location = Point(lblDim->Right + 6, 10);
 
             // GroupBox матрицы
@@ -198,24 +197,17 @@ namespace CramerSolver {
             UpdateGrids();
         }
 
-        // Проверка ввода (только числа) + предупреждение
+        // Проверка ввода (только числа)
         System::Void dgv_CellValidating(System::Object^ sender, DataGridViewCellValidatingEventArgs^ e)
         {
             DataGridView^ dgv = safe_cast<DataGridView^>(sender);
             String^ value = e->FormattedValue->ToString();
-
             if (String::IsNullOrWhiteSpace(value))
                 return;
 
             double tmp;
             if (!Double::TryParse(value, tmp))
             {
-                // Показываем диалог с ошибкой
-                MessageBox::Show(L"Допустимы только числовые значения.\nПожалуйста, введите число.",
-                    L"Ошибка ввода",
-                    MessageBoxButtons::OK,
-                    MessageBoxIcon::Warning);
-
                 dgv->Rows[e->RowIndex]->Cells[e->ColumnIndex]->ErrorText = L"Введите число";
                 e->Cancel = true;
             }
@@ -259,7 +251,7 @@ namespace CramerSolver {
             return vec;
         }
 
-        // Решение (с измерением времени)
+        // Решение
         System::Void btnSolve_Click(System::Object^ sender, System::EventArgs^ e)
         {
             try
@@ -267,18 +259,15 @@ namespace CramerSolver {
                 int n = (int)nudDimension->Value;
                 auto A = ReadMatrix(dgvMatrix, n);
                 auto B = ReadConstants(dgvConstants, n);
-
                 std::vector<double> X;
                 double mainDet = 0;
                 std::vector<double> auxDets;
 
-                // Запуск секундомера
                 Stopwatch^ sw = gcnew Stopwatch();
                 sw->Start();
 
                 bool hasSolution = MatrixUtils::SolveCramer(A, B, n, X, mainDet, auxDets);
 
-                // Остановка и получение миллисекунд
                 sw->Stop();
                 long long elapsedMs = sw->ElapsedMilliseconds;
 
@@ -299,7 +288,6 @@ namespace CramerSolver {
                 for (int i = 0; i < n; i++)
                     ss << L"x" << (i + 1) << L" = " << X[i] << L"\r\n";
 
-                // Вывод времени
                 ss << L"\r\nВремя вычисления: " << elapsedMs << L" мс";
 
                 txtLog->Text = gcnew String(ss.str().c_str());
@@ -312,7 +300,7 @@ namespace CramerSolver {
             }
         }
 
-        // Очистка всех полей
+        // Очистка
         System::Void btnClear_Click(System::Object^ sender, System::EventArgs^ e)
         {
             for each(DataGridViewRow ^ row in dgvMatrix->Rows)
@@ -324,11 +312,12 @@ namespace CramerSolver {
             lblStatus->Text = L"Готов";
         }
 
-        // Загрузка тестового примера 3x3
+        // Загрузка тестового примера 3x3 
         System::Void btnExample_Click(System::Object^ sender, System::EventArgs^ e)
         {
-            nudDimension->Value = 3;
+            nudDimension->Value = 3; // автоматически вызовет UpdateGrids()
 
+            // Заполнение матрицы A
             double a[3][3] = { {2, 1, -1},
                                {3, -2, 4},
                                {1, 1, 1} };
@@ -342,23 +331,38 @@ namespace CramerSolver {
             }
             lblStatus->Text = L"Загружен пример 3x3";
         }
+        /* Для заполнения целыми числами следующая функция
+        void RandomFill() {
+    Random^ rand = gcnew Random();
+    int n = (int)nudDimension->Value;
+    int minVal = -100;
+    int maxVal = 100;
 
-        // Заполнение случайными ЦЕЛЫМИ числами
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++)
+            dgvMatrix->Rows[i]->Cells[j]->Value =
+                rand->Next(minVal, maxVal + 1).ToString();
+
+    for (int i = 0; i < n; i++)
+        dgvConstants->Rows[i]->Cells[0]->Value =
+            rand->Next(minVal, maxVal + 1).ToString();
+            }
+            */
+
+            // Заполнение случайными числами
         void RandomFill()
         {
             Random^ rand = gcnew Random();
             int n = (int)nudDimension->Value;
-            int minVal = -100;
-            int maxVal = 100;
 
             for (int i = 0; i < n; i++)
                 for (int j = 0; j < n; j++)
                     dgvMatrix->Rows[i]->Cells[j]->Value =
-                    rand->Next(minVal, maxVal + 1).ToString();
+                    (rand->NextDouble() * 20.0 - 10.0).ToString("F2");
 
             for (int i = 0; i < n; i++)
                 dgvConstants->Rows[i]->Cells[0]->Value =
-                rand->Next(minVal, maxVal + 1).ToString();
+                (rand->NextDouble() * 20.0 - 10.0).ToString("F2");
         }
 
         System::Void btnRandom_Click(System::Object^ sender, System::EventArgs^ e)
